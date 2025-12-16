@@ -8,7 +8,7 @@ export default function StarfleetContact() {
   const { theme } = useTheme();
   const bgRef = useRef<HTMLDivElement>(null);
 
-  // 🔮 Background glow animation
+  // Background glow animation
   useEffect(() => {
     if (!bgRef.current) return;
     const colorUtopia = "#00ffff";
@@ -29,7 +29,7 @@ export default function StarfleetContact() {
     );
   }, [theme]);
 
-  // 🎨 Dynamic colors
+  // Dynamic colors
   const glow = theme === "utopia" ? "#00ffff" : "#cc7722";
   const textGlow = theme === "utopia" ? "cyan" : "orange";
   const gradientFrom =
@@ -45,7 +45,7 @@ export default function StarfleetContact() {
     <div
       className={`min-h-screen bg-gradient-to-br ${gradientFrom} flex items-center justify-center p-8 relative overflow-hidden`}
     >
-      {/* ✨ Floating background stars */}
+      {/* Floating background stars */}
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(50)].map((_, i) => (
           <div
@@ -65,7 +65,7 @@ export default function StarfleetContact() {
         ))}
       </div>
 
-      {/* 💫 Radial light pulse */}
+      {/*  Radial light pulse */}
       <div className="absolute inset-0 opacity-30">
         <div
           ref={bgRef}
@@ -76,7 +76,7 @@ export default function StarfleetContact() {
         />
       </div>
 
-      {/* 🪩 Main container */}
+      {/*  Main container */}
       <div className="relative w-full max-w-5xl">
         {/* Outer glowing border */}
         <div
@@ -88,7 +88,7 @@ export default function StarfleetContact() {
           }}
         />
 
-        {/* 🌌 Card core */}
+        {/* Card core */}
         <div
           className={`relative bg-slate-900/40 backdrop-blur-md border-2 ${borderColor} shadow-2xl overflow-hidden`}
           style={{

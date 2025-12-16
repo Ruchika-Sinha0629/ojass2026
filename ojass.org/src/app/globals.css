@@ -158,3 +158,29 @@ textarea,
         @apply bg-background text-foreground;
     }
 }
+
+@keyframes dashMove {
+        to {
+            strokedashoffset: "-300";
+        }
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    .animate-pulse-slow {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .animate-dash-move {
+        animation: dashMove 20s linear infinite;
+    }
+    .animate-slide-in {
+        animation: slideIn 0.3s easeforwards;
+    }
