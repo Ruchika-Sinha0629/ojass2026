@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import GlassyNeonBoard from "@/components/OverlayLayout/dashboard/GlassyNeonBorad";
 import Profile from "@/components/OverlayLayout/dashboard/Profile";
@@ -7,11 +8,23 @@ import Receipt from "@/components/OverlayLayout/dashboard/Reciept";
 import RegisteredEvent from "@/components/OverlayLayout/dashboard/RegisteredEvent";
 import Team from "@/components/OverlayLayout/dashboard/Team";
 import Certificate from "@/components/OverlayLayout/dashboard/Certificate";
+import Notification from "@/components/OverlayLayout/dashboard/Notification";
+import EmailVerificationModal from "@/components/OverlayLayout/dashboard/EmailVerificationModal";
+import Loader from "@/components/Loader";
 
 export default function OjassDashboard() {
+  const router = useRouter();
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState("profile");
-  const currentUserId = "u1";
+  const [activeTab, setActiveTab] = useState("receipt");
+  const [profileData, setProfileData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
+  const [paymentData, setPaymentData] = useState<any>(null);
+  const [pricing, setPricing] = useState<any>(null);
+  const [userTeams, setUserTeams] = useState<any[]>([]);
+  const [registeredEvents, setRegisteredEvents] = useState<any[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const currentUserId = profileData?._id || "u1";
 
   // 🌗 Theme-based color mapping (same concept as StarfleetContact)
   const glow = theme === "utopia" ? "#00ffff" : "#cc7722";
@@ -28,61 +41,164 @@ export default function OjassDashboard() {
       ? "hover:border-cyan-400/60 hover:bg-cyan-400/10"
       : "hover:border-amber-500/60 hover:bg-amber-500/10";
 
-  const profileData = {
-    name: "Rahul Kumar",
-    email: "rahul@example.com",
-    college: "NIT Patna",
-    phone: "+91 9876543210",
-    ojassId: "OJASS2024-1234",
-    year: "3rd Year",
-    branch: "Computer Science",
-  };
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = localStorage.getItem('user');
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-  const teamData = [
-    {
-      _id: "t1",
-      eventId: "e1",
-      eventName: "Hackathon",
-      isIndividual: false,
-      teamName: "Code Warriors",
-      teamLeader: "u1",
-      teamMembers: [
-        { _id: "u1", name: "Rahul Kumar" },
-        { _id: "u2", name: "Aditi" },
-        { _id: "u3", name: "Rohit" },
-      ],
-      joinToken: "ABC123",
-      status: "Active",
-    },
-    {
-      _id: "t2",
-      eventId: "e2",
-      eventName: "Robowars",
-      isIndividual: false,
-      teamName: "Robo Titans",
-      teamLeader: "u4",
-      teamMembers: [
-        { _id: "u4", name: "Vikram" },
-        { _id: "u5", name: "Neha" },
-      ],
-      joinToken: "XYZ987",
-      status: "Active",
-    },
-  ];
+      try {
+        const userData = JSON.parse(user);
+        const userProfile = {
+          name: userData.name,
+          email: userData.email,
+          college: userData.collegeName,
+          phone: userData.phone,
+          ojassId: userData.ojassId,
+          gender: userData.gender,
+          city: userData.city,
+          state: userData.state,
+          isPaid: userData.isPaid,
+          isEmailVerified: userData.isEmailVerified,
+          referralCount: userData.referralCount || 0,
+          idCardImageUrl: userData.idCardImageUrl || null,
+          idCardCloudinaryId: userData.idCardCloudinaryId || null,
+          _id: userData._id
+        };
+        setProfileData(userProfile);
 
-  const userTeams = teamData.filter(team =>
-    team.teamMembers.some(member => member._id === currentUserId)
-  );
+        // Fetch payment status and pricing
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Fetch payment status
+          const paymentRes = await fetch('/api/payment/status', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
 
-  const registeredEvents = [
-    { id: 1, name: "Hackathon", date: "Nov 16, 2024", time: "9:00 AM", status: "Confirmed", team: "Code Warriors" },
-    { id: 2, name: "Robowars", date: "Nov 15, 2024", time: "10:00 AM", status: "Confirmed", team: "Robo Titans" },
-    { id: 3, name: "Tech Quiz", date: "Nov 17, 2024", time: "2:00 PM", status: "Pending", team: "Solo" },
-  ];
+          if (paymentRes.ok) {
+            const payment = await paymentRes.json();
+            setPaymentData(payment);
+            // Update profile data with latest payment status
+            userProfile.isPaid = payment.isPaid;
+            userProfile.isEmailVerified = payment.isEmailVerified;
+            setProfileData({ ...userProfile });
+          }
 
-  const certificates = [
-    { id: 1, event: "Web Development Workshop", type: "Participation", date: "Nov 10, 2024" },
-    { id: 2, event: "Coding Competition 2023", type: "Winner - 2nd Place", date: "Nov 5, 2023" },
+          // Fetch pricing
+          const pricingRes = await fetch('/api/pricing', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (pricingRes.ok) {
+            const pricingData = await pricingRes.json();
+            setPricing(pricingData);
+          }
+
+          // Fetch user teams
+          setLoadingTeams(true);
+          try {
+            const teamsRes = await fetch('/api/teams', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (teamsRes.ok) {
+              const teams = await teamsRes.json();
+              // Filter out individual teams (only show actual teams, not individual registrations)
+              const actualTeams = teams.filter((team: any) => !team.isIndividual);
+              // Transform teams to match Team component format
+              const transformedTeams = actualTeams.map((team: any) => ({
+                _id: team._id,
+                eventId: team.eventId?._id || team.eventId,
+                eventName: team.eventId?.name || 'Unknown Event',
+                isIndividual: team.isIndividual,
+                teamName: team.teamName || 'Individual',
+                teamLeader: typeof team.teamLeader === 'object'
+                  ? {
+                    _id: team.teamLeader._id,
+                    name: team.teamLeader.name || 'Unknown',
+                    ojassId: team.teamLeader.ojassId
+                  }
+                  : team.teamLeader,
+                teamMembers: team.teamMembers
+                  .filter((member: any) => {
+                    // Filter out leader from members list
+                    const memberId = typeof member === 'object' ? member._id : member;
+                    const leaderId = typeof team.teamLeader === 'object'
+                      ? team.teamLeader._id
+                      : team.teamLeader;
+                    return memberId.toString() !== leaderId.toString();
+                  })
+                  .map((member: any) => ({
+                    _id: typeof member === 'object' ? member._id : member,
+                    name: typeof member === 'object' ? member.name : 'Unknown',
+                    ojassId: typeof member === 'object' ? member.ojassId : undefined
+                  })),
+                joinToken: team.joinToken || '',
+                isVerified: team.isVerified || false
+              }));
+              setUserTeams(transformedTeams);
+            }
+          } catch (err) {
+            console.error('Error fetching teams:', err);
+          } finally {
+            setLoadingTeams(false);
+          }
+
+          // Fetch registered events
+          try {
+            const registrationsRes = await fetch('/api/events/my-registrations', {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (registrationsRes.ok) {
+              const registrations = await registrationsRes.json();
+              // Transform registrations to match expected format
+              const transformedRegistrations = registrations.map((reg: any) => ({
+                id: reg._id,
+                name: reg.eventId?.name || 'Unknown Event',
+                date: new Date(reg.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                }),
+                time: new Date(reg.createdAt).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }),
+                status: reg.isVerified ? 'Confirmed' : 'Pending',
+                team: reg.isIndividual ? 'Solo' : (reg.teamName || 'Team'),
+                registration: reg,
+                isVerified: reg.isVerified || false
+              }));
+              setRegisteredEvents(transformedRegistrations);
+            }
+          } catch (err) {
+            console.error('Error fetching registrations:', err);
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  // Certificate type definition
+  interface Certificate {
+    id: string;
+    event: string;
+    type: string;
+    date: string;
+    url: string;
+  }
+
+  const certificates: Certificate[] = [
+
   ];
 
   const stars = useMemo(
@@ -96,6 +212,14 @@ export default function OjassDashboard() {
       })),
     []
   );
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  if (!profileData) {
+    return null;
+  }
 
   return (
     <div className="bg-black relative overflow-hidden">
@@ -122,7 +246,23 @@ export default function OjassDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {/* PROFILE CARD */}
-            <GlassyNeonBoard title="PROFILE">
+            <GlassyNeonBoard
+              title="PROFILE"
+              isEmailVerified={profileData?.isEmailVerified || false}
+              isPaid={paymentData?.isPaid || false}
+              pricing={pricing}
+              onPaymentClick={() => setActiveTab('receipt')}
+              onEmailVerificationClick={() => setShowEmailVerificationModal(true)}
+              onRegisterNow={() => {
+                // Navigate to events page for registration
+                setActiveTab('events');
+              }}
+              onDownloadReceipt={() => {
+                // Set flag to trigger receipt download
+                // sessionStorage.setItem('downloadReceipt', 'true');
+                // setActiveTab('receipt');
+              }}
+            >
               <div
                 className="
                   overflow-y-auto
@@ -138,8 +278,8 @@ export default function OjassDashboard() {
             {/* DASHBOARD CARD */}
             <GlassyNeonBoard title="DASHBOARD">
               {/* Tabs */}
-              <div className="flex gap-3 mb-8 flex-wrap">
-                {["RECIEPT", "EVENTS", "TEAMS", "CERTIFICATES"].map((tab) => {
+              <div className="flex gap-3 py-6 flex-wrap">
+                {["RECEIPT", "EVENTS", "TEAMS", "CERTIFICATES", "NOTIFICATIONS"].map((tab) => {
                   const isActive = activeTab === tab.toLowerCase();
                   return (
                     <button
@@ -148,7 +288,7 @@ export default function OjassDashboard() {
                       className={`px-4 py-2 text-xs font-mono transition-all backdrop-blur-sm border ${buttonInactiveBorder} ${isActive
                         ? `${buttonActiveBg} ${accentText} border-2`
                         : `${accentText} opacity-70 ${buttonInactiveHover}`
-                      }`}
+                        }`}
                       style={{
                         clipPath:
                           "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)",
@@ -164,12 +304,12 @@ export default function OjassDashboard() {
               <div
                 className="
                   overflow-y-auto
-                  h-[55vh] sm:h-[60vh] md:h-[65vh] lg:h-[70vh]
-                  xl:h-[73vh] 2xl:h-[75vh] 4xl:h-[77vh]
-                  scrollbar-thin scrollbar-thumb-cyan-500/40 scrollbar-track-transparent
+                  h-[55vh] sm:h-[60vh] md:h-[65vh] lg:h-[75vh]
+                  xl:h-[78vh] 2xl:h-[75vh] 4xl:h-[77vh]
+                  scrollbar-thin scrollbar-thumb-cyan-500/40 scrollbar-track-transparent py-4
                 "
               >
-                {activeTab === "receipt" && <Receipt />}
+                {activeTab === "receipt" && <Receipt userData={profileData} />}
                 {activeTab === "events" && (
                   <RegisteredEvent registeredEvents={registeredEvents} />
                 )}
@@ -179,11 +319,32 @@ export default function OjassDashboard() {
                 {activeTab === "certificates" && (
                   <Certificate certificates={certificates} />
                 )}
+                {activeTab === "notifications" && (
+                  <Notification />
+                )}
               </div>
             </GlassyNeonBoard>
           </div>
         </div>
       </div>
+
+      {/* Email Verification Modal */}
+      {showEmailVerificationModal && profileData && (
+        <EmailVerificationModal
+          isOpen={showEmailVerificationModal}
+          onClose={() => setShowEmailVerificationModal(false)}
+          email={profileData.email}
+          onVerificationSuccess={() => {
+            // Refresh user data
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const updatedUser = { ...user, isEmailVerified: true };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            setProfileData({ ...profileData, isEmailVerified: true });
+            // Reload page to refresh all data
+            window.location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -25,8 +25,8 @@ const RegisterSection = () => {
             Ready to Join the Team?
           </h2>
           <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-            Become a Campus Ambassador and help spread innovation across campuses.
-            Register now and be part of OJASS 2026!
+          Be a Campus Ambassador, ignite innovation, and represent OJASS
+          2026 — register today!
           </p>
           <motion.a
             href="/dashboard"
@@ -34,7 +34,7 @@ const RegisterSection = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Register Now
+            Login Now
             <ArrowRight className="w-5 h-5" />
           </motion.a>
         </motion.div>

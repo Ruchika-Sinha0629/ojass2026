@@ -13,11 +13,18 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ['local-origin.dev', '10.240.208.161'],
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'ojass-2024.vercel.app', // <-- Error waala domain
+        hostname: 'ojass-2024.vercel.app',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
         port: '',
         pathname: '/**',
       },

@@ -14,15 +14,15 @@ export default function RegisteredEvent({
   // 🎨 Theme-based glow and colors
   const glow = theme === "utopia" ? "#00ffff" : "#cc7722";
   const borderColor =
-    theme === "utopia" ? "border-cyan-400/30" : "border-amber-500/30";
+    theme === "utopia" ? "border-cyan-400/30" : "border-red-500";
   const gradientFrom =
     theme === "utopia"
       ? "from-cyan-500/10 to-blue-500/5"
-      : "from-amber-700/15 to-orange-900/10";
+      : "from-amber-700/15 to-amber-900/10";
   const hoverGradient =
     theme === "utopia"
       ? "hover:from-cyan-500/20 hover:to-blue-500/10"
-      : "hover:from-amber-700/25 hover:to-orange-900/15";
+      : "hover:from-amber-700/25 hover:to-red-900/15";
   const textColor =
     theme === "utopia" ? "text-cyan-300" : "text-amber-400";
   const boxShadow = `0 0 15px ${glow}22, inset 0 0 12px ${glow}18`;
@@ -53,18 +53,18 @@ export default function RegisteredEvent({
             </div>
             <span
               className={`text-xs font-mono px-2 py-1 rounded border border-white/10 ${
-                event.status === "Confirmed"
+                event.status === "Confirmed" || event.isVerified
                   ? "bg-green-500/20 text-green-300"
-                  : "bg-yellow-500/20 text-yellow-300"
+                  : "bg-red-500/20 text-red-300"
               }`}
               style={{
                 boxShadow:
-                  event.status === "Confirmed"
+                  event.status === "Confirmed" || event.isVerified
                     ? `0 0 10px rgba(0,255,0,0.3)`
-                    : `0 0 10px rgba(255,255,0,0.3)`,
+                    : `0 0 10px rgba(255,0,0,0.3)`,
               }}
             >
-              {event.status}
+              {event.status === "Confirmed" || event.isVerified ? "Verified" : "Unverified"}
             </span>
           </div>
 

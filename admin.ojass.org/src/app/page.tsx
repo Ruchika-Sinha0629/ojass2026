@@ -1,22 +1,67 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { authAPI } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Try to get current user - if successful, user is logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Redirect to dashboard if already logged in
+          router.push('/dashboard');
+        }
+      } catch (err) {
+        // User is not logged in, stay on login page
+        console.log('Not authenticated');
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        // Login - use username or email field as email
+        const loginEmail = username.trim() || email.trim();
+        if (!loginEmail || !password) {
+          setError('Please enter email and password');
+          setLoading(false);
+          return;
+        }
+
+        await authAPI.login(loginEmail, password);
+        router.push('/dashboard');
+      } else {
+        // Signup is not supported for admin panel
+        setError('Admin signup is not available. Please contact system administrator.');
+        setLoading(false);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      setLoading(false);
+    }
   };
 
+  const isLogin = true;
+  const email = '';
   const isFormValid = isLogin
     ? (username.trim() !== '' || email.trim() !== '') && password.length >= 6
     : username.trim() !== '' && email.trim() !== '' && password.length >= 6;
@@ -27,7 +72,7 @@ export default function AuthPage() {
       <div className="absolute inset-0 overflow-hidden">
         {/* Atmospheric Haze Layer */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-transparent to-gray-950/90 z-10" />
-        
+
         {/* Sky with slight fog */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-gray-950 to-black" />
 
@@ -39,11 +84,11 @@ export default function AuthPage() {
             <div className="absolute left-12 top-32 w-3 h-32 bg-gradient-to-b from-pink-500 to-pink-600 rounded-full blur-sm animate-pulse shadow-[0_0_20px_pink]" />
             <div className="absolute left-20 top-20 w-3 h-40 bg-gradient-to-b from-cyan-500 to-blue-500 rounded-full blur-sm animate-pulse shadow-[0_0_20px_cyan]" style={{ animationDelay: '0.5s' }} />
             <div className="absolute left-28 top-40 w-3 h-28 bg-gradient-to-b from-pink-500 to-pink-600 rounded-full blur-sm animate-pulse shadow-[0_0_20px_pink]" style={{ animationDelay: '1s' }} />
-            
+
             {/* Horizontal screens */}
             <div className="absolute left-8 top-64 w-24 h-4 bg-gradient-to-r from-cyan-500/50 to-blue-500/50 blur-sm rounded" />
             <div className="absolute left-8 top-80 w-32 h-3 bg-gradient-to-r from-pink-500/50 to-cyan-500/50 blur-sm rounded" />
-            
+
             {/* Window lights */}
             {Array.from({ length: 15 }).map((_, i) => (
               <div
@@ -69,13 +114,13 @@ export default function AuthPage() {
               <div className="absolute inset-8 rounded-full border border-cyan-300/40" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-cyan-400/40 rounded-full blur-sm" />
             </div>
-            
+
             {/* Second holographic screen */}
             <div className="absolute right-8 top-72 w-40 h-24 bg-gradient-to-br from-blue-500/30 via-cyan-500/20 to-transparent rounded-lg border border-blue-400/50 backdrop-blur-sm">
               <div className="absolute inset-3 rounded-full border border-blue-400/60" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-blue-400/50 rounded-full" />
             </div>
-            
+
             {/* Window lights */}
             {Array.from({ length: 20 }).map((_, i) => (
               <div
@@ -128,7 +173,7 @@ export default function AuthPage() {
           <div className="absolute bottom-8 left-[20%] w-24 h-2 bg-cyan-500/30 blur-md rounded-full" />
           <div className="absolute bottom-12 right-[30%] w-32 h-3 bg-pink-500/30 blur-lg rounded-full" />
           <div className="absolute bottom-6 left-[60%] w-20 h-2 bg-blue-500/30 blur-md rounded-full" />
-          
+
           {/* Ground neon circles */}
           <div className="absolute bottom-16 left-[15%] w-16 h-16 border-2 border-orange-500/50 rounded-full blur-sm animate-pulse" />
           <div className="absolute bottom-20 right-[25%] w-12 h-12 border-2 border-cyan-500/50 rounded-full blur-sm animate-pulse" style={{ animationDelay: '0.5s' }} />
@@ -148,60 +193,20 @@ export default function AuthPage() {
               Login
             </h1>
             <p className="text-gray-400 text-sm">
-              {isLogin ? 'Sign in to your account' : 'Create your account'}
+              Sign in to your admin account
             </p>
           </div>
 
-          {/* Toggle Button with Neon Accent */}
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <span className={`text-sm font-medium transition-colors ${isLogin ? 'text-cyan-400' : 'text-gray-500'}`}>
-              Log In
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setUsername('');
-                setEmail('');
-                setPassword('');
-                setShowPassword(false);
-              }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                isLogin ? 'bg-cyan-500/30 border border-cyan-400/50' : 'bg-gray-700 border border-gray-600'
-              }`}
-              aria-label="Toggle between login and signup"
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isLogin ? 'translate-x-6 shadow-[0_0_8px_cyan]' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className={`text-sm font-medium transition-colors ${!isLogin ? 'text-pink-400' : 'text-gray-500'}`}>
-              Sign Up
-            </span>
-          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
-              <div className="relative">
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <svg className="w-5 h-5 text-cyan-400/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 bg-gray-800/70 border-b-2 border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-colors"
-                  required={!isLogin}
-                />
-              </div>
-            )}
-
             <div className="relative">
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 <svg className="w-5 h-5 text-cyan-400/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,18 +214,13 @@ export default function AuthPage() {
                 </svg>
               </div>
               <input
-                type={isLogin ? 'text' : 'email'}
-                placeholder={isLogin ? 'Email or Username' : 'Email'}
-                value={isLogin ? username : email}
-                onChange={(e) => {
-                  if (isLogin) {
-                    setUsername(e.target.value);
-                  } else {
-                    setEmail(e.target.value);
-                  }
-                }}
+                type="text"
+                placeholder="Email or Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 pr-12 bg-gray-800/70 border-b-2 border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-colors"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -237,6 +237,7 @@ export default function AuthPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 pr-20 bg-gray-800/70 border-b-2 border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 transition-colors"
                 required
+                disabled={loading}
               />
               {password && (
                 <button
@@ -282,32 +283,18 @@ export default function AuthPage() {
 
             <button
               type="submit"
-              disabled={!isFormValid}
-              className={`w-full py-3 rounded-lg text-sm font-semibold mt-6 transition-all relative overflow-hidden ${
-                isFormValid
-                  ? 'bg-gradient-to-r from-cyan-500/80 to-blue-500/80 text-white hover:from-cyan-500 hover:to-blue-500 border border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.3)]'
-                  : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'
-              }`}
+              disabled={loading || !isFormValid}
+              className={`w-full py-3 rounded-lg text-sm font-semibold mt-6 transition-all relative overflow-hidden ${isFormValid && !loading
+                ? 'bg-gradient-to-r from-cyan-500/80 to-blue-500/80 text-white hover:from-cyan-500 hover:to-blue-500 border border-cyan-400/50 shadow-[0_0_20px_rgba(34,211,238,0.3)]'
+                : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'
+                }`}
             >
-              <span className="relative z-10">{isLogin ? 'Login' : 'Sign Up'}</span>
+              <span className="relative z-10">
+                {loading ? 'Logging in...' : 'Login'}
+              </span>
             </button>
           </form>
 
-          {/* Sign Up Link */}
-          {isLogin && (
-            <div className="text-center mt-6">
-              <p className="text-sm text-gray-400">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setIsLogin(false)}
-                  className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
-                >
-                  Register
-                </button>
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

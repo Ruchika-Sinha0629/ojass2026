@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import connectToDatabase, { connectPromise } from '@/lib/mongodb';
+import connectToDatabase from '@/lib/mongodb';
 import Media from '@/models/Media';
 import { uploadFilesToCloudinary } from '@/utils/cloudinary.util';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Configure max file size (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
             resource_type: 'auto'
         });
 
-    // DB connection is initialized on module import (see src/lib/mongodb.ts)
+        // DB connection is initialized on module import (see src/lib/mongodb.ts)
 
         // Ensure initial DB connection has completed to avoid buffering timeouts
         // Ensure DB connection — call connectToDatabase which will return cached.conn
@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
                 userId: userId || null,
                 publicId: result.public_id,
                 url: result.url,
-                fileName: (result as any).original_filename || file.name,
+                fileName: (result as { original_filename?: string }).original_filename || file.name,
                 fileType: file.type,
-                fileSize: (result as any).bytes || file.size,
-                resourceType: (result as any).resource_type || 'image',
+                fileSize: (result as { bytes?: number }).bytes || file.size,
+                resourceType: (result as { resource_type?: string }).resource_type || 'image',
                 folder: 'ojass2026',
                 isIdCard: isIdCard || false
             });
@@ -114,10 +114,11 @@ export async function POST(request: NextRequest) {
             },
             { status: 201 }
         );
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('File upload error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Internal server error';
         return NextResponse.json(
-            { error: error.message || 'Internal server error' },
+            { error: errorMessage },
             { status: 500 }
         );
     }

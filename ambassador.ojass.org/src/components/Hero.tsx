@@ -1,9 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Award, Users } from "lucide-react";
+import { Award } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 
 const Hero = () => {
 
@@ -22,7 +21,7 @@ const Hero = () => {
             initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="space-y-6"
+            className="space-y-6 text-center lg:text-left"
           >
             {/* Badge */}
             <motion.div
@@ -65,14 +64,14 @@ const Hero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.5 }}
-              className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-xl"
+              className="text-lg sm:text-xl text-gray-600 leading-relaxed max-w-xl mx-auto lg:mx-0"
             >
-              Join the OJASS team and help us spread innovation across campuses.
-              Be the bridge between your college and India&apos;s premier tech fest.
+              Be the spark on your campus! Represent OJASS, India’s
+              premier tech fest, and drive innovation forward.
             </motion.p>
 
             {/* CTA Button */}
-            <motion.div
+            {/* <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.5 }}
@@ -84,7 +83,7 @@ const Hero = () => {
                 Login for CA
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-            </motion.div>
+            </motion.div> */}
 
             {/* Stats */}
             {/* <motion.div
@@ -107,9 +106,9 @@ const Hero = () => {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="relative hidden lg:block"
+            className="relative mt-12 lg:mt-0 flex justify-center lg:block"
           >
-            <Image src="/sponsor.svg" alt="Sponsor" width={1000} height={1000} />
+            <Image src="/sponsor.svg" alt="Sponsor" width={1000} height={1000} className="w-full max-w-md lg:max-w-full" />
           </motion.div>
         </div>
       </div>

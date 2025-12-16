@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 
 export async function POST(
   req: Request,
-  { params }: { params: { registrationId: string } }
+  { params }: { params: Promise<{ registrationId: string }> }
 ) {
   await connectToDatabase();
 
@@ -16,7 +16,7 @@ export async function POST(
     const tokenCookie = (await cookieStore).get("admin_token");
     requireAdmin(tokenCookie?.value); // throws if invalid
 
-    const { registrationId } = params;
+    const { registrationId } = await params;
 
     // Find the team registration
     const registration = await Team.findById(registrationId);
@@ -35,8 +35,9 @@ export async function POST(
       success: true,
       message: "Registration verified",
     });
-  } catch (err: any) {
-    const status = err.message.includes("Unauthorized") ? 401 : 400;
-    return NextResponse.json({ error: err.message }, { status });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const status = err.message?.includes("Unauthorized") ? 401 : 400;
+    return NextResponse.json({ error: err.message || "An error occurred" }, { status });
   }
 }

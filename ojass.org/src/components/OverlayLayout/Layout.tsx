@@ -11,6 +11,9 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { NavItems } from "@/lib/constants";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+// import Bot from "./Bot";
+// import Bot from "./Bot";
+import Bot from "@/components/Bot";
 
 export default function OverlayLayout() {
     const { toggleTheme } = useTheme();
@@ -29,7 +32,8 @@ export default function OverlayLayout() {
         (item) =>
             item.title.toLowerCase() === path ||
             path === "/" ||
-            path === "/login",
+            path === "/login" ||
+            path === "/team"
     );
 
     return (
@@ -39,7 +43,7 @@ export default function OverlayLayout() {
                 <LeftPanel /> <Footer /></>}
 
 
-
+            {path !== '/bot' && <Bot />}
             <ThemeToggleButton onToggle={handleThemeChange} />
 
             <GlitchTransition

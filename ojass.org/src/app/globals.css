@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-
 @custom-variant dystopia (&:is(.dystopia *));
 
 @theme inline {
@@ -40,47 +39,13 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
-}
-* {
-    box-sizing: border-box;
-    cursor: none !important;
+
+    --font-size-10xl: 10rem;
+    --font-size-11xl: 11rem;
+    --font-size-12xl: 12rem;
+    --font-size-13xl: 13rem;
 }
 
-/* ✅ Hide scrollbar globally across browsers */
-html, body {
-  overflow: -moz-scrollbars-none; /* Firefox (legacy) */
-  -ms-overflow-style: none; /* IE, Edge */
-  scrollbar-width: none; /* Firefox modern */
-}
-
-/* Chrome, Safari, Opera */
-::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-
-html,
-body,
-body * {
-    cursor: none !important;
-}
-
-/* Override any cursor styles that might be applied */
-a,
-button,
-input,
-select,
-textarea,
-[role="button"],
-.cursor-pointer,
-[style*="cursor"],
-[style*="cursor: pointer"],
-[style*="cursor: grab"],
-[style*="cursor: grabbing"] {
-    cursor: none !important;
-}
 :root {
     --radius: 0.625rem;
     --background: oklch(1 0 0);
@@ -150,6 +115,23 @@ textarea,
     --sidebar-ring: oklch(0.556 0 0);
 }
 
+* {
+    box-sizing: border-box;
+    cursor: none !important;
+}
+
+html,
+body {
+    overflow: -moz-scrollbars-none;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    cursor: none !important;
+}
+
+::-webkit-scrollbar {
+    display: none;
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;
@@ -159,7 +141,30 @@ textarea,
     }
 }
 
+<<<<<<< HEAD
 @keyframes dashMove {
+=======
+@layer utilities {
+    @keyframes horizontal-scroll {
+        from {
+            transform: translateX(0);
+        }
+        to {
+            transform: translateX(-100%);
+        }
+    }
+
+    @keyframes horizontal-scroll-2 {
+        from {
+            transform: translateX(100%);
+        }
+        to {
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes dashMove {
+>>>>>>> 0c7bb68a13a2f21e43d205d584be0b955939b2c9
         to {
             strokedashoffset: "-300";
         }
@@ -175,6 +180,7 @@ textarea,
             transform: translateY(0);
         }
     }
+<<<<<<< HEAD
     .animate-pulse-slow {
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
@@ -184,3 +190,26 @@ textarea,
     .animate-slide-in {
         animation: slideIn 0.3s easeforwards;
     }
+=======
+
+    .animate-horizontal-scroll {
+        animation: horizontal-scroll linear 16s infinite;
+    }
+
+    .animate-horizontal-scroll-2 {
+        animation: horizontal-scroll-2 linear 16s infinite;
+    }
+
+    .animate-pulse-slow {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .animate-dash-move {
+        animation: dashMove 20s linear infinite;
+    }
+
+    .animate-slide-in {
+        animation: slideIn 0.3s easeforwards;
+    }
+}
+>>>>>>> 0c7bb68a13a2f21e43d205d584be0b955939b2c9

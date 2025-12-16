@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 
 export async function GET(
   req: Request,
-  { params }: { params: { eventId: string; registrationId: string } }
+  { params }: { params: Promise<{ eventId: string; registrationId: string }> }
 ) {
   await connectToDatabase();
 
@@ -16,7 +16,7 @@ export async function GET(
     const tokenCookie = (await cookieStore).get("admin_token"); // directly get the cookie
     requireAdmin(tokenCookie?.value);
 
-    const { registrationId } = params;
+    const { registrationId } = await params;
 
     // Find the team registration
     const registration = await Team.findById(registrationId)
@@ -28,7 +28,8 @@ export async function GET(
     }
 
     return NextResponse.json(registration, { status: 200 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 401 });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    return NextResponse.json({ error: err.message || "An error occurred" }, { status: 401 });
   }
 }

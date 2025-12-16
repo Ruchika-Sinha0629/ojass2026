@@ -1,176 +1,430 @@
 'use client';
 
-import { useState } from 'react';
+import EventForm from '@/components/EventForm';
+import { authAPI, CreateEventData, CreateNotificationData, Event, eventAPI, Notification, notificationAPI, Team, teamAPI, User, userAPI } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-
-// Fake data hello
-const initialEvents = [
-  { id: 1, name: 'Tech Fest 2024', date: '2024-03-15', participants: 150, status: 'Active', description: 'A comprehensive technology festival showcasing the latest innovations in tech industry.' },
-  { id: 2, name: 'Hackathon', date: '2024-04-20', participants: 89, status: 'Active', description: '48-hour coding competition where teams build innovative solutions to real-world problems.' },
-  { id: 3, name: 'Workshop Series', date: '2024-05-10', participants: 234, status: 'Upcoming', description: 'Series of hands-on workshops covering various topics in software development and emerging technologies.' },
-  { id: 4, name: 'Coding Competition', date: '2024-03-01', participants: 67, status: 'Completed', description: 'Competitive programming contest challenging participants with algorithmic problems.' },
-];
-
-const fakeStudents = [
-  { id: 1, name: 'John Doe', email: 'john@example.com', college: 'MIT', registeredAt: '2024-01-15', events: 3, ojassId: 'OJASS001', paymentStatus: 'paid' },
-  { id: 2, name: 'Jane Smith', email: 'jane@example.com', college: 'Stanford', registeredAt: '2024-01-20', events: 2, ojassId: 'OJASS002', paymentStatus: 'paid' },
-  { id: 3, name: 'Bob Johnson', email: 'bob@example.com', college: 'Harvard', registeredAt: '2024-02-01', events: 1, ojassId: 'OJASS003', paymentStatus: 'unpaid' },
-  { id: 4, name: 'Alice Williams', email: 'alice@example.com', college: 'Caltech', registeredAt: '2024-02-05', events: 4, ojassId: 'OJASS004', paymentStatus: 'paid' },
-  { id: 5, name: 'Charlie Brown', email: 'charlie@example.com', college: 'MIT', registeredAt: '2024-02-10', events: 2, ojassId: 'OJASS005', paymentStatus: 'unpaid' },
-];
-
-const fakeAmbassadors = [
-  { id: 1, name: 'Sarah Connor', email: 'sarah@example.com', referrals: 25, paid: 15, unpaid: 10, status: 'Active' },
-  { id: 2, name: 'Mike Tyson', email: 'mike@example.com', referrals: 18, paid: 18, unpaid: 0, status: 'Active' },
-  { id: 3, name: 'Emma Watson', email: 'emma@example.com', referrals: 32, paid: 20, unpaid: 12, status: 'Active' },
-  { id: 4, name: 'Tom Cruise', email: 'tom@example.com', referrals: 14, paid: 8, unpaid: 6, status: 'Inactive' },
-  { id: 5, name: 'Lisa Park', email: 'lisa@example.com', referrals: 41, paid: 35, unpaid: 6, status: 'Active' },
-];
-
-const fakeTeams = [
-  { id: 1, name: 'Team Alpha', eventId: 1, eventName: 'Tech Fest 2024', members: 4, leader: 'John Doe', registeredAt: '2024-01-15', ojassId: 'TEAM001', studentIds: [1, 2] },
-  { id: 2, name: 'Team Beta', eventId: 1, eventName: 'Tech Fest 2024', members: 3, leader: 'Jane Smith', registeredAt: '2024-01-18', ojassId: 'TEAM002', studentIds: [2, 3] },
-  { id: 3, name: 'Team Gamma', eventId: 2, eventName: 'Hackathon', members: 5, leader: 'Bob Johnson', registeredAt: '2024-02-01', ojassId: 'TEAM003', studentIds: [3, 4] },
-  { id: 4, name: 'Team Delta', eventId: 2, eventName: 'Hackathon', members: 4, leader: 'Alice Williams', registeredAt: '2024-02-05', ojassId: 'TEAM004', studentIds: [4, 5] },
-  { id: 5, name: 'Team Echo', eventId: 3, eventName: 'Workshop Series', members: 2, leader: 'Charlie Brown', registeredAt: '2024-02-10', ojassId: 'TEAM005', studentIds: [1, 5] },
-  { id: 6, name: 'Team Zeta', eventId: 3, eventName: 'Workshop Series', members: 3, leader: 'Sarah Connor', registeredAt: '2024-02-12', ojassId: 'TEAM006', studentIds: [2, 3, 4] },
-  { id: 7, name: 'Team Eta', eventId: 4, eventName: 'Coding Competition', members: 4, leader: 'Mike Tyson', registeredAt: '2024-01-20', ojassId: 'TEAM007', studentIds: [1, 3, 4, 5] },
-];
+import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState<'events' | 'students' | 'ambassadors' | 'team'>('events');
-  const [teamEventFilter, setTeamEventFilter] = useState<number | 'all'>('all');
-  const [events, setEvents] = useState(initialEvents);
+  const [activeSection, setActiveSection] = useState<'events' | 'students' | 'ambassadors' | 'team' | 'individual' | 'notifications'>('events');
+  const [events, setEvents] = useState<Event[]>([]);
   const [eventSearch, setEventSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [mounted, setMounted] = useState(false);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
-  const [selectedEventParticipants, setSelectedEventParticipants] = useState<number | null>(null);
+  const [teamEventFilter, setTeamEventFilter] = useState<string | 'all'>('all');
+  const [selectedEventParticipants, setSelectedEventParticipants] = useState<string | null>(null);
   const [selectedAmbassadorReferrals, setSelectedAmbassadorReferrals] = useState<number | null>(null);
-  const [selectedStudentDetails, setSelectedStudentDetails] = useState<number | null>(null);
-  const [selectedTeamDetails, setSelectedTeamDetails] = useState<number | null>(null);
-  const [showAddEventModal, setShowAddEventModal] = useState(false);
-  const [newEvent, setNewEvent] = useState({
-    name: '',
-    date: '',
-    description: '',
-    status: 'Upcoming' as 'Active' | 'Upcoming' | 'Completed',
-    participants: 0,
-  });
+  const [ambassadorReferralsData, setAmbassadorReferralsData] = useState<Array<{ _id: string; name: string; email: string; phone: string; ojassId: string; college: string; isPaid: boolean; registeredAt: string }>>([]);
+  const [loadingAmbassadorReferrals, setLoadingAmbassadorReferrals] = useState(false);
+  const [selectedStudentDetails, setSelectedStudentDetails] = useState<string | null>(null);
+  const [selectedStudentFullData, setSelectedStudentFullData] = useState<User | null>(null);
+  const [loadingStudentDetails, setLoadingStudentDetails] = useState(false);
+  const [studentRegistrations, setStudentRegistrations] = useState<Team[]>([]);
+  const [loadingStudentRegistrations, setLoadingStudentRegistrations] = useState(false);
+  const [selectedTeamDetails, setSelectedTeamDetails] = useState<string | null>(null);
+  const [students, setStudents] = useState<User[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [individualRegistrations, setIndividualRegistrations] = useState<Team[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [loadingIndividual, setLoadingIndividual] = useState(false);
+  const [individualEventFilter, setIndividualEventFilter] = useState<string | 'all'>('all');
+  const studentsPage = 1;
+  const teamsPage = 1;
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationForm, setNotificationForm] = useState<CreateNotificationData>({ title: '', description: '' });
+  const [sendingNotification, setSendingNotification] = useState(false);
 
-  const handleLogout = () => {
-    router.push('/');
+  // Set mounted state after hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Load events on mount
+  useEffect(() => {
+    if (mounted) {
+      loadEvents();
+      loadStudents();
+      loadTeams();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
+
+  // Load students when filters change
+  useEffect(() => {
+    if (mounted) {
+      loadStudents();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentSearch, paymentFilter, studentsPage, mounted]);
+
+  // Load teams when filters change
+  useEffect(() => {
+    if (mounted) {
+      loadTeams();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamEventFilter, teamsPage, mounted]);
+
+  // Load individual registrations when filters change or section is active
+  useEffect(() => {
+    if (mounted && activeSection === 'individual') {
+      loadIndividualRegistrations();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [individualEventFilter, activeSection, mounted]);
+
+  // Load notifications when section is active
+  useEffect(() => {
+    if (mounted && activeSection === 'notifications') {
+      loadNotifications();
+    }
+
+  }, [activeSection, mounted]);
+
+  // Fetch full student details when modal opens
+  useEffect(() => {
+    if (selectedStudentDetails && !selectedStudentFullData && !loadingStudentDetails) {
+      setLoadingStudentDetails(true);
+      userAPI.getById(selectedStudentDetails)
+        .then((fullData) => {
+          setSelectedStudentFullData(fullData);
+          setLoadingStudentDetails(false);
+        })
+        .catch((error) => {
+          console.error('Error fetching student details:', error);
+          setLoadingStudentDetails(false);
+        });
+    }
+  }, [selectedStudentDetails, selectedStudentFullData, loadingStudentDetails]);
+
+  // Fetch student registrations when modal opens
+  useEffect(() => {
+    if (selectedStudentDetails && !loadingStudentRegistrations) {
+      setLoadingStudentRegistrations(true);
+      userAPI.getRegistrations(selectedStudentDetails)
+        .then((registrations) => {
+          setStudentRegistrations(registrations);
+          setLoadingStudentRegistrations(false);
+        })
+        .catch((error) => {
+          console.error('Error fetching student registrations:', error);
+          setLoadingStudentRegistrations(false);
+        });
+    }
+  }, [selectedStudentDetails, loadingStudentRegistrations]);
+
+  // Clear full data when modal closes
+  useEffect(() => {
+    if (!selectedStudentDetails) {
+      setSelectedStudentFullData(null);
+      setLoadingStudentDetails(false);
+      setStudentRegistrations([]);
+      setLoadingStudentRegistrations(false);
+    }
+  }, [selectedStudentDetails]);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await eventAPI.getAll();
+      setEvents(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load events');
+      console.error('Error loading events:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStudents = async () => {
+    try {
+      setLoadingStudents(true);
+      const response = await userAPI.getAll({
+        page: studentsPage,
+        limit: 50,
+        search: studentSearch,
+        paymentStatus: paymentFilter,
+      });
+      setStudents(response.users);
+    } catch (err: unknown) {
+      console.error('Error loading students:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load students');
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
+
+  const loadTeams = async () => {
+    try {
+      setLoadingTeams(true);
+      const eventId = teamEventFilter === 'all' ? undefined : teamEventFilter;
+      const response = await teamAPI.getAll({
+        page: teamsPage,
+        limit: 50,
+        eventId,
+        isIndividual: 'false', // Only get teams, not individual registrations
+      });
+      // Filter out individual registrations
+      setTeams(response.teams.filter((team) => !team.isIndividual));
+    } catch (err: unknown) {
+      console.error('Error loading teams:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load teams');
+    } finally {
+      setLoadingTeams(false);
+    }
+  };
+
+  const loadIndividualRegistrations = async () => {
+    try {
+      setLoadingIndividual(true);
+      const eventId = individualEventFilter === 'all' ? undefined : individualEventFilter;
+      const response = await teamAPI.getAll({
+        page: 1,
+        limit: 1000, // Get all individual registrations
+        eventId,
+        isIndividual: 'true', // Only get individual registrations
+      });
+      setIndividualRegistrations(response.teams.filter((team) => team.isIndividual));
+    } catch (err: unknown) {
+      console.error('Error loading individual registrations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load individual registrations');
+    } finally {
+      setLoadingIndividual(false);
+    }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      setLoadingNotifications(true);
+      const response = await notificationAPI.getAll();
+      if (response.success) {
+        setNotifications(response.data);
+      }
+    } catch (err: unknown) {
+      console.error('Error loading notifications:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const handleCreateNotification = async () => {
+    if (!notificationForm.title || !notificationForm.description) {
+      setError('Title and description are required');
+      return;
+    }
+
+    try {
+      setSendingNotification(true);
+      setError('');
+      const response = await notificationAPI.create(notificationForm);
+      if (response.success) {
+        setShowNotificationModal(false);
+        setNotificationForm({ title: '', description: '' });
+        await loadNotifications();
+        alert(`Notification sent successfully! Sent to ${response.data.recipients} users. Push notifications: ${response.data.pushNotifications.sent} sent, ${response.data.pushNotifications.failed} failed.`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send notification');
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      router.push('/');
+    }
   };
 
   const handleOpenAddEvent = () => {
+    setEditingEvent(null);
     setShowAddEventModal(true);
-    setNewEvent({
-      name: '',
-      date: '',
-      description: '',
-      status: 'Upcoming',
-      participants: 0,
-    });
   };
 
   const handleCloseAddEvent = () => {
     setShowAddEventModal(false);
-    setNewEvent({
-      name: '',
-      date: '',
-      description: '',
-      status: 'Upcoming',
-      participants: 0,
-    });
+    setEditingEvent(null);
   };
 
-  const handleSubmitEvent = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newId = Math.max(...events.map(e => e.id), 0) + 1;
-    const eventToAdd = {
-      id: newId,
-      ...newEvent,
-    };
-    setEvents([...events, eventToAdd]);
-    handleCloseAddEvent();
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setShowAddEventModal(true);
   };
 
-  const handleDeleteEvent = (eventId: number) => {
-    if (confirm('Are you sure you want to delete this event?')) {
-      setEvents(events.filter(event => event.id !== eventId));
+  const handleSubmitEvent = async (eventData: CreateEventData) => {
+    try {
+      setSubmitting(true);
+      setError('');
+      if (editingEvent) {
+        await eventAPI.update(editingEvent._id, eventData);
+      } else {
+        await eventAPI.create(eventData);
+      }
+      await loadEvents();
+      handleCloseAddEvent();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save event');
+      throw err;
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleViewEvent = (eventId: number) => {
-    alert(`View event ${eventId} - This would show event details`);
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Are you sure you want to delete this event?')) {
+      return;
+    }
+
+    try {
+      setError('');
+      await eventAPI.delete(eventId);
+      await loadEvents();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete event';
+      setError(message);
+      alert(message);
+    }
   };
 
-  const handleEditEvent = (eventId: number) => {
-    alert(`Edit event ${eventId} - This would open edit form`);
+  const handleViewEvent = (event: Event) => {
+    setViewingEvent(event);
   };
 
-  const getEventParticipants = (eventId: number) => {
-    const teams = fakeTeams.filter(team => team.eventId === eventId);
-    const participants: Array<{ student: typeof fakeStudents[0], teamName: string, teamOjassId: string }> = [];
-    
-    teams.forEach(team => {
-      team.studentIds?.forEach(studentId => {
-        const student = fakeStudents.find(s => s.id === studentId);
-        if (student) {
-          participants.push({
-            student,
-            teamName: team.name,
-            teamOjassId: team.ojassId
+  const handleCloseViewEvent = () => {
+    setViewingEvent(null);
+  };
+
+
+
+  // Fetch ambassador referrals when modal opens
+  useEffect(() => {
+    if (selectedAmbassadorReferrals) {
+      const ambassadors = students.filter(s => s.referralCount > 0);
+      const ambassador = ambassadors[(selectedAmbassadorReferrals || 1) - 1];
+
+      if (ambassador && !loadingAmbassadorReferrals) {
+        setLoadingAmbassadorReferrals(true);
+        userAPI.getReferrals(ambassador._id)
+          .then((data) => {
+            setAmbassadorReferralsData(data.referredUsers);
+            setLoadingAmbassadorReferrals(false);
+          })
+          .catch((error) => {
+            console.error('Error fetching ambassador referrals:', error);
+            setLoadingAmbassadorReferrals(false);
+            setAmbassadorReferralsData([]);
           });
-        }
-      });
-    });
-    
-    return participants;
-  };
+      }
+    }
+  }, [selectedAmbassadorReferrals, students, loadingAmbassadorReferrals]);
 
-  const getAmbassadorReferrals = (ambassadorId: number) => {
-    // Fake referral data - in real app this would come from backend
-    return fakeStudents.slice(0, 3).map(student => ({
-      ...student,
-      referralDate: '2024-01-15',
-      paymentStatus: Math.random() > 0.5 ? 'paid' : 'unpaid'
-    }));
-  };
+  // Clear referrals data when modal closes
+  useEffect(() => {
+    if (!selectedAmbassadorReferrals) {
+      setAmbassadorReferralsData([]);
+      setLoadingAmbassadorReferrals(false);
+    }
+  }, [selectedAmbassadorReferrals]);
 
-  const getTeamMembers = (teamId: number) => {
-    const team = fakeTeams.find(t => t.id === teamId);
-    if (!team || !team.studentIds) return [];
-    
-    return team.studentIds.map(studentId => {
-      const student = fakeStudents.find(s => s.id === studentId);
-      return student;
+  const getTeamMembers = (teamId: string) => {
+    const team = teams.find(t => t._id === teamId);
+    if (!team || !team.teamMembers) return [];
+
+    return team.teamMembers.map((member) => {
+      if (typeof member === 'object') {
+        return member;
+      }
+      return students.find(s => s._id === member);
     }).filter(Boolean);
   };
 
   const filteredEvents = events.filter((event) => {
-    const searchLower = eventSearch.toLowerCase();
-    return event.name.toLowerCase().includes(searchLower) ||
-           event.id.toString().includes(eventSearch) ||
-           event.date.includes(eventSearch);
+    if (!event || !event.name) return false;
+
+    // If search is empty, show all events
+    const searchTerm = eventSearch || '';
+    if (searchTerm.trim() === '') {
+      return true;
+    }
+
+    const searchLower = searchTerm.toLowerCase().trim();
+    return (event.name?.toLowerCase().includes(searchLower) ?? false) ||
+      (event._id?.toLowerCase().includes(searchLower) ?? false) ||
+      (event.description?.toLowerCase().includes(searchLower) ?? false);
   });
 
-  const filteredStudents = fakeStudents.filter((student) => {
-    const searchLower = studentSearch.toLowerCase();
-    const matchesSearch = studentSearch === '' ||
-      student.name.toLowerCase().includes(searchLower) ||
-      student.ojassId.toLowerCase().includes(searchLower) ||
-      student.email.toLowerCase().includes(searchLower);
-    
+  const filteredStudents = students.filter((student) => {
+    const searchTerm = studentSearch || '';
+    if (searchTerm.trim() === '') {
+      // If no search term, only filter by payment status
+      return paymentFilter === 'all' || (paymentFilter === 'paid' ? student.isPaid : !student.isPaid);
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = student.name?.toLowerCase().includes(searchLower) ||
+      student.ojassId?.toLowerCase().includes(searchLower) ||
+      student.email?.toLowerCase().includes(searchLower) ||
+      student.collegeName?.toLowerCase().includes(searchLower);
+
     const matchesPayment = paymentFilter === 'all' ||
-      student.paymentStatus === paymentFilter;
-    
+      (paymentFilter === 'paid' ? student.isPaid : !student.isPaid);
+
     return matchesSearch && matchesPayment;
   });
 
-  const filteredTeams = teamEventFilter === 'all' 
-    ? fakeTeams 
-    : fakeTeams.filter(team => team.eventId === teamEventFilter);
+  const filteredTeams = teams.filter((team) => {
+    if (teamEventFilter === 'all') return true;
+    const eventId = typeof team.eventId === 'object' ? team.eventId._id : team.eventId;
+    return eventId === teamEventFilter;
+  });
+
+  // Prevent hydration mismatch by not rendering event-dependent content until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        {/* Header */}
+        <header className="bg-white shadow-md border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                OJASS Admin Dashboard
+              </h1>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-gray-700 hover:text-indigo-600 font-medium"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </header>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -199,16 +453,17 @@ export default function Dashboard() {
               { key: 'events', label: 'Events' },
               { key: 'students', label: 'Students' },
               { key: 'ambassadors', label: 'Ambassadors' },
-              { key: 'team', label: 'Team' },
+              { key: 'team', label: 'Teams' },
+              { key: 'individual', label: 'Individual Events' },
+              { key: 'notifications', label: 'Notifications' },
             ].map((tab) => (
               <button
                 key={tab.key}
-                onClick={() => setActiveSection(tab.key as any)}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                  activeSection === tab.key
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                onClick={() => setActiveSection(tab.key as typeof activeSection)}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${activeSection === tab.key
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -230,7 +485,13 @@ export default function Dashboard() {
                   + Add Event
                 </button>
               </div>
-              
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
+
               {/* Search Bar */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -238,65 +499,68 @@ export default function Dashboard() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Search by name, ID, or email..."
+                  placeholder="Search by name, ID, or description..."
                   value={eventSearch}
                   onChange={(e) => setEventSearch(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredEvents.map((event) => (
-                  <div key={event.id} className="border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-shadow relative">
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-xl font-semibold text-gray-800">{event.name}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        event.status === 'Active' ? 'bg-green-100 text-green-700' :
-                        event.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {event.status}
-                      </span>
+              {loading ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Loading events...</p>
+                </div>
+              ) : filteredEvents.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No events found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredEvents.map((event) => (
+                    <div key={event._id} className="border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-shadow relative">
+                      {event.img && (
+                        <img src={event.img} alt={event.name} className="w-full h-32 object-cover rounded-lg mb-3" />
+                      )}
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="text-xl font-semibold text-gray-800">{event.name}</h3>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${event.isTeamEvent ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                          }`}>
+                          {event.isTeamEvent ? 'Team' : 'Individual'}
+                        </span>
+                      </div>
+                      <p className="text-gray-600 mb-2"><strong>Team Size:</strong> {event.teamSizeMin}-{event.teamSizeMax}</p>
+                      {event.organizer && (
+                        <p className="text-gray-600 mb-2"><strong>Organizer:</strong> {event.organizer}</p>
+                      )}
+                      {event.description && (
+                        <p className="text-gray-600 mb-4 text-sm line-clamp-2"><strong>Description:</strong> {event.description}</p>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 mb-2">
+                        <button
+                          onClick={() => handleViewEvent(event)}
+                          className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleEditEvent(event)}
+                          className="flex-1 px-3 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(event._id)}
+                          className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-gray-600 mb-2"><strong>Date:</strong> {event.date}</p>
-                    <p className="text-gray-600 mb-2"><strong>Participants:</strong> {event.participants}</p>
-                    {event.description && (
-                      <p className="text-gray-600 mb-4 text-sm line-clamp-2"><strong>Description:</strong> {event.description}</p>
-                    )}
-                    
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 mb-2">
-                      <button
-                        onClick={() => handleViewEvent(event.id)}
-                        className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => handleEditEvent(event.id)}
-                        className="flex-1 px-3 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => setSelectedEventParticipants(event.id)}
-                        className="px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors"
-                        title="View Participants"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Participants Modal */}
               {selectedEventParticipants && (
@@ -304,7 +568,7 @@ export default function Dashboard() {
                   <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-2xl font-bold text-gray-800">
-                        Participants - {events.find(e => e.id === selectedEventParticipants)?.name}
+                        Participants - {events.find(e => e._id === selectedEventParticipants)?.name}
                       </h3>
                       <button
                         onClick={() => setSelectedEventParticipants(null)}
@@ -325,13 +589,11 @@ export default function Dashboard() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {getEventParticipants(selectedEventParticipants).map((participant, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{participant.student.name}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{participant.teamName}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{participant.teamOjassId}</td>
-                            </tr>
-                          ))}
+                          <tr>
+                            <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
+                              Click on an event to view participants
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -339,12 +601,188 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Add Event Modal */}
+              {/* View Event Modal */}
+              {viewingEvent && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCloseViewEvent}>
+                  <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-2xl font-bold text-gray-800">Event Details</h3>
+                      <button
+                        onClick={handleCloseViewEvent}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="space-y-6">
+                      {/* Event Image */}
+                      {viewingEvent.img && (
+                        <div>
+                          <img
+                            src={viewingEvent.img}
+                            alt={viewingEvent.name}
+                            className="w-full h-64 object-cover rounded-lg"
+                          />
+                        </div>
+                      )}
+
+                      {/* Basic Information */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Event Name</label>
+                          <p className="text-gray-900 font-semibold">{viewingEvent.name}</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${viewingEvent.isTeamEvent ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                            {viewingEvent.isTeamEvent ? 'Team Event' : 'Individual Event'}
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Team Size</label>
+                          <p className="text-gray-900">{viewingEvent.teamSizeMin} - {viewingEvent.teamSizeMax} {viewingEvent.isTeamEvent ? 'members' : 'participant'}</p>
+                        </div>
+                        {viewingEvent.organizer && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Organizer</label>
+                            <p className="text-gray-900">{viewingEvent.organizer}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <p className="text-gray-900 whitespace-pre-wrap">{viewingEvent.description}</p>
+                      </div>
+
+                      {/* Prizes */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Prizes</label>
+                        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Prize:</span>
+                            <span className="text-gray-900 font-semibold">{viewingEvent.prizes?.total || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Winner:</span>
+                            <span className="text-gray-900 font-semibold">{viewingEvent.prizes?.winner || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">First Runner-up:</span>
+                            <span className="text-gray-900 font-semibold">{viewingEvent.prizes?.first_runner_up || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Second Runner-up:</span>
+                            <span className="text-gray-900 font-semibold">{viewingEvent.prizes?.second_runner_up || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Event Details */}
+                      {viewingEvent.details && viewingEvent.details.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Event Details</label>
+                          <ul className="list-disc list-inside space-y-1 bg-gray-50 rounded-lg p-4">
+                            {viewingEvent.details.map((detail, index) => (
+                              <li key={index} className="text-gray-900">{detail}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Rules */}
+                      {viewingEvent.rules && viewingEvent.rules.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Rules</label>
+                          <ul className="list-disc list-inside space-y-1 bg-gray-50 rounded-lg p-4">
+                            {viewingEvent.rules.map((rule, index) => (
+                              <li key={index} className="text-gray-900">{rule}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Event Head */}
+                      {viewingEvent.event_head && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Event Head</label>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-gray-900"><strong>Name:</strong> {viewingEvent.event_head.name}</p>
+                            <p className="text-gray-900"><strong>Phone:</strong> {viewingEvent.event_head.Phone}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Links */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {viewingEvent.rulebookurl && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Rulebook URL</label>
+                            <a
+                              href={viewingEvent.rulebookurl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline break-all"
+                            >
+                              {viewingEvent.rulebookurl}
+                            </a>
+                          </div>
+                        )}
+                        {viewingEvent.redirect && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Redirect Path</label>
+                            <p className="text-gray-900 break-all">{viewingEvent.redirect}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Winners */}
+                      {viewingEvent.winners && viewingEvent.winners.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Winners</label>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-gray-600 text-sm">{viewingEvent.winners.length} winner(s) declared</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-end gap-3 pt-4 border-t">
+                        <button
+                          onClick={handleCloseViewEvent}
+                          className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Close
+                        </button>
+                        <button
+                          onClick={() => {
+                            setViewingEvent(null);
+                            setEditingEvent(viewingEvent);
+                            setShowAddEventModal(true);
+                          }}
+                          className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                        >
+                          Edit Event
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Add/Edit Event Modal */}
               {showAddEventModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleCloseAddEvent}>
-                  <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-bold text-gray-800">Add New Event</h3>
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        {editingEvent ? 'Edit Event' : 'Add New Event'}
+                      </h3>
                       <button
                         onClick={handleCloseAddEvent}
                         className="text-gray-500 hover:text-gray-700"
@@ -355,94 +793,12 @@ export default function Dashboard() {
                       </button>
                     </div>
 
-                    <form onSubmit={handleSubmitEvent} className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Event Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={newEvent.name}
-                          onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                          placeholder="Enter event name"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Event Date <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="date"
-                          required
-                          value={newEvent.date}
-                          onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Description <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          required
-                          value={newEvent.description}
-                          onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                          placeholder="Enter event description"
-                          rows={4}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Status <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          required
-                          value={newEvent.status}
-                          onChange={(e) => setNewEvent({ ...newEvent, status: e.target.value as 'Active' | 'Upcoming' | 'Completed' })}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        >
-                          <option value="Upcoming">Upcoming</option>
-                          <option value="Active">Active</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Initial Participants
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={newEvent.participants}
-                          onChange={(e) => setNewEvent({ ...newEvent, participants: parseInt(e.target.value) || 0 })}
-                          placeholder="Enter initial participant count"
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div className="flex gap-3 pt-4">
-                        <button
-                          type="button"
-                          onClick={handleCloseAddEvent}
-                          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
-                        >
-                          Add Event
-                        </button>
-                      </div>
-                    </form>
+                    <EventForm
+                      event={editingEvent || undefined}
+                      onSubmit={handleSubmitEvent}
+                      onCancel={handleCloseAddEvent}
+                      loading={submitting}
+                    />
                   </div>
                 </div>
               )}
@@ -453,7 +809,7 @@ export default function Dashboard() {
           {activeSection === 'students' && (
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Students</h2>
-              
+
               {/* Search Bar and Filter */}
               <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -488,7 +844,6 @@ export default function Dashboard() {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OJASS ID</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
@@ -500,26 +855,34 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredStudents.length > 0 ? (
+                    {loadingStudents ? (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                          Loading students...
+                        </td>
+                      </tr>
+                    ) : filteredStudents.length > 0 ? (
                       filteredStudents.map((student) => (
-                        <tr key={student.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.id}</td>
+                        <tr key={student._id} className="hover:bg-gray-50">
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.ojassId}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{student.email}</td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{student.college}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{student.collegeName}</td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              student.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              {student.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${student.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                              {student.isPaid ? 'Paid' : 'Unpaid'}
                             </span>
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{student.registeredAt}</td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{student.events}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {new Date(student.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {student.eventCount || 0}
+                          </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                             <button
-                              onClick={() => setSelectedStudentDetails(student.id)}
+                              onClick={() => setSelectedStudentDetails(student._id)}
                               className="text-indigo-600 hover:text-indigo-800 transition-colors"
                               title="View Details"
                             >
@@ -544,14 +907,20 @@ export default function Dashboard() {
 
               {/* Student Details Modal */}
               {selectedStudentDetails && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setSelectedStudentDetails(null)}>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => {
+                  setSelectedStudentDetails(null);
+                  setSelectedStudentFullData(null);
+                }}>
                   <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-2xl font-bold text-gray-800">
                         Student Details
                       </h3>
                       <button
-                        onClick={() => setSelectedStudentDetails(null)}
+                        onClick={() => {
+                          setSelectedStudentDetails(null);
+                          setSelectedStudentFullData(null);
+                        }}
                         className="text-gray-500 hover:text-gray-700"
                       >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -560,18 +929,34 @@ export default function Dashboard() {
                       </button>
                     </div>
                     {(() => {
-                      const student = fakeStudents.find(s => s.id === selectedStudentDetails);
-                      if (!student) return null;
+                      const studentFromList = students.find(s => s._id === selectedStudentDetails);
+
+                      if (loadingStudentDetails) {
+                        return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-500">Loading student details...</p>
+                          </div>
+                        );
+                      }
+
+                      const student = selectedStudentFullData || studentFromList;
+                      if (!student) {
+                        return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-500">Student not found</p>
+                          </div>
+                        );
+                      }
                       return (
                         <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="text-sm font-medium text-gray-500">Student ID</label>
-                              <p className="text-lg font-semibold text-gray-900">{student.id}</p>
-                            </div>
-                            <div>
                               <label className="text-sm font-medium text-gray-500">OJASS ID</label>
                               <p className="text-lg font-semibold text-gray-900">{student.ojassId}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Phone</label>
+                              <p className="text-lg font-semibold text-gray-900">{student.phone}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Name</label>
@@ -583,26 +968,140 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">College</label>
-                              <p className="text-lg text-gray-900">{student.college}</p>
+                              <p className="text-lg text-gray-900">{student.collegeName}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Payment Status</label>
                               <p className="text-lg">
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  student.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                }`}>
-                                  {student.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${student.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                  {student.isPaid ? 'Paid' : 'Unpaid'}
                                 </span>
                               </p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Registration Date</label>
-                              <p className="text-lg text-gray-900">{student.registeredAt}</p>
+                              <p className="text-lg text-gray-900">{new Date(student.createdAt).toLocaleDateString()}</p>
                             </div>
                             <div>
-                              <label className="text-sm font-medium text-gray-500">Events Registered</label>
-                              <p className="text-lg font-semibold text-gray-900">{student.events}</p>
+                              <label className="text-sm font-medium text-gray-500">Referral Count</label>
+                              <p className="text-lg font-semibold text-gray-900">{student.referralCount || 0}</p>
                             </div>
+                          </div>
+
+                          {/* ID Card Section */}
+                          {student.idCardImageUrl && (
+                            <div className="mt-6 pt-6 border-t">
+                              <label className="block text-sm font-medium text-gray-700 mb-3">ID Card</label>
+                              <div className="bg-gray-50 rounded-lg p-4 flex justify-center">
+                                <img
+                                  src={student.idCardImageUrl}
+                                  alt={`${student.name}'s ID Card`}
+                                  className="max-w-full h-auto max-h-96 rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                                  onClick={() => {
+                                    // Open image in new tab for full view
+                                    window.open(student.idCardImageUrl, '_blank');
+                                  }}
+                                  onError={(e) => {
+                                    // Handle image load errors
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    const parent = (e.target as HTMLImageElement).parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = '<p className="text-gray-500 text-sm">ID card image not available</p>';
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2 text-center">
+                                Click image to view in full size
+                              </p>
+                            </div>
+                          )}
+                          {!student.idCardImageUrl && (
+                            <div className="mt-6 pt-6 border-t">
+                              <label className="block text-sm font-medium text-gray-700 mb-3">ID Card</label>
+                              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                <p className="text-gray-500 text-sm">No ID card uploaded</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Event Registrations Section */}
+                          <div className="mt-6 pt-6 border-t">
+                            <label className="block text-sm font-medium text-gray-700 mb-3">Event Registrations</label>
+                            {loadingStudentRegistrations ? (
+                              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                <p className="text-gray-500 text-sm">Loading registrations...</p>
+                              </div>
+                            ) : studentRegistrations.length > 0 ? (
+                              <div className="space-y-3">
+                                {studentRegistrations.map((registration) => {
+                                  const eventName = typeof registration.eventId === 'object'
+                                    ? registration.eventId.name
+                                    : 'Unknown Event';
+                                  const isLeader = typeof registration.teamLeader === 'object'
+                                    ? registration.teamLeader._id === student._id
+                                    : registration.teamLeader === student._id;
+                                  const role = isLeader ? 'Leader' : 'Member';
+                                  const participationType = registration.isIndividual ? 'Individual' : 'Team';
+                                  const teamName = registration.isIndividual ? null : (registration.teamName || 'Team');
+
+                                  return (
+                                    <div
+                                      key={registration._id}
+                                      className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-indigo-300 transition-colors"
+                                    >
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div className="flex-1">
+                                          <h4 className="font-semibold text-gray-900">{eventName}</h4>
+                                          <div className="flex flex-wrap gap-2 mt-2">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${registration.isVerified === true
+                                              ? 'bg-green-100 text-green-700'
+                                              : 'bg-red-100 text-red-700'
+                                              }`}>
+                                              {registration.isVerified === true ? 'Verified' : 'Unverified'}
+                                            </span>
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                              {participationType}
+                                            </span>
+                                            {!registration.isIndividual && (
+                                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                                {role}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="mt-2 space-y-1 text-sm text-gray-600">
+                                        {teamName && (
+                                          <p><span className="font-medium">Team:</span> {teamName}</p>
+                                        )}
+                                        <p>
+                                          <span className="font-medium">Registered:</span>{' '}
+                                          {new Date(registration.createdAt).toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                          })}
+                                        </p>
+                                        {!registration.isIndividual && typeof registration.teamMembers === 'object' && (
+                                          <p>
+                                            <span className="font-medium">Team Size:</span>{' '}
+                                            {registration.teamMembers.length} member{registration.teamMembers.length !== 1 ? 's' : ''}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                <p className="text-gray-500 text-sm">No event registrations found</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -618,8 +1117,8 @@ export default function Dashboard() {
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Ambassadors</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {fakeAmbassadors.map((ambassador) => (
-                  <div key={ambassador.id} className="border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-shadow">
+                {students.filter(s => s.referralCount > 0).map((ambassador, index) => (
+                  <div key={ambassador._id} className="border border-gray-200 rounded-lg p-5 hover:shadow-lg transition-shadow">
                     <div className="mb-3">
                       <h3 className="text-lg font-semibold text-gray-800">{ambassador.name}</h3>
                     </div>
@@ -627,19 +1126,19 @@ export default function Dashboard() {
                     <div className="mt-4 space-y-2">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Referrals:</span>
-                        <span className="font-semibold">{ambassador.referrals}</span>
+                        <span className="font-semibold">{ambassador.referralCount || 0}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-green-600">Paid:</span>
-                        <span className="font-semibold text-green-600">{ambassador.paid}</span>
+                        <span className="font-semibold text-green-600">{ambassador.isPaid ? 'Yes' : 'No'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-red-600">Unpaid:</span>
-                        <span className="font-semibold text-red-600">{ambassador.unpaid}</span>
+                        <span className="text-gray-600">OJASS ID:</span>
+                        <span className="font-semibold">{ambassador.ojassId}</span>
                       </div>
                     </div>
                     <button
-                      onClick={() => setSelectedAmbassadorReferrals(ambassador.id)}
+                      onClick={() => setSelectedAmbassadorReferrals(index + 1)}
                       className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all"
                     >
                       View Referral Details
@@ -654,7 +1153,7 @@ export default function Dashboard() {
                   <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-2xl font-bold text-gray-800">
-                        Referral Details - {fakeAmbassadors.find(a => a.id === selectedAmbassadorReferrals)?.name}
+                        Referral Details - {students.filter(s => s.referralCount > 0)[(selectedAmbassadorReferrals || 1) - 1]?.name || 'Unknown'}
                       </h3>
                       <button
                         onClick={() => setSelectedAmbassadorReferrals(null)}
@@ -678,22 +1177,41 @@ export default function Dashboard() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {getAmbassadorReferrals(selectedAmbassadorReferrals).map((referral, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{referral.name}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.ojassId}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.email}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.college}</td>
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  referral.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                }`}>
-                                  {referral.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
-                                </span>
+                          {loadingAmbassadorReferrals ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                                Loading referrals...
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.referralDate}</td>
                             </tr>
-                          ))}
+                          ) : ambassadorReferralsData.length > 0 ? (
+                            ambassadorReferralsData.map((referral) => (
+                              <tr key={referral._id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{referral.name}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.ojassId}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.email}</td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{referral.college}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${referral.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                    }`}>
+                                    {referral.isPaid ? 'Paid' : 'Unpaid'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                  {new Date(referral.registeredAt).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                                No referrals found
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -710,12 +1228,12 @@ export default function Dashboard() {
                 <h2 className="text-2xl font-bold text-gray-800">Teams</h2>
                 <select
                   value={teamEventFilter}
-                  onChange={(e) => setTeamEventFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                  onChange={(e) => setTeamEventFilter(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="all">All Events</option>
                   {events.map((event) => (
-                    <option key={event.id} value={event.id}>{event.name}</option>
+                    <option key={event._id} value={event._id}>{event.name}</option>
                   ))}
                 </select>
               </div>
@@ -727,32 +1245,94 @@ export default function Dashboard() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leader</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Members</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Verified</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredTeams.map((team) => (
-                      <tr key={team.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{team.name}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{team.eventName}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{team.leader}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{team.members}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{team.registeredAt}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <button
-                            onClick={() => setSelectedTeamDetails(team.id)}
-                            className="text-indigo-600 hover:text-indigo-800 transition-colors"
-                            title="View Details"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
+                    {loadingTeams ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                          Loading teams...
                         </td>
                       </tr>
-                    ))}
+                    ) : filteredTeams.length > 0 ? (
+                      filteredTeams.map((team) => {
+                        const eventName = typeof team.eventId === 'object' ? team.eventId.name : 'Unknown';
+                        const leader = typeof team.teamLeader === 'object' ? team.teamLeader.name : 'Unknown';
+                        return (
+                          <tr key={team._id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{team.teamName || 'Individual'}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{eventName}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{leader}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{team.teamMembers?.length || 0}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${team.isVerified === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                {team.isVerified === true ? 'Verified' : 'Unverified'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(team.createdAt).toLocaleDateString()}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={team.isVerified === true}
+                                  onChange={async (e) => {
+                                    const newValue = e.target.checked;
+                                    // Optimistically update UI
+                                    setTeams((prev) =>
+                                      prev.map((t) =>
+                                        t._id === team._id ? { ...t, isVerified: newValue } : t
+                                      )
+                                    );
+                                    try {
+                                      const { teamAPI } = await import('@/lib/api');
+                                      const result = await teamAPI.update(team._id, { isVerified: newValue });
+                                      // Update with server response
+                                      setTeams((prev) =>
+                                        prev.map((t) =>
+                                          t._id === team._id ? { ...t, isVerified: result.team.isVerified ?? false } : t
+                                        )
+                                      );
+                                    } catch (error: unknown) {
+                                      console.error('Error updating team verification:', error);
+                                      // Revert on error
+                                      setTeams((prev) =>
+                                        prev.map((t) =>
+                                          t._id === team._id ? { ...t, isVerified: team.isVerified ?? false } : t
+                                        )
+                                      );
+                                      alert(error instanceof Error ? error.message : 'Failed to update team verification status');
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                  title={team.isVerified === true ? 'Unverify' : 'Verify'}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <button
+                                  onClick={() => setSelectedTeamDetails(team._id)}
+                                  className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                  title="View Details"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                          No teams found.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -775,36 +1355,83 @@ export default function Dashboard() {
                       </button>
                     </div>
                     {(() => {
-                      const team = fakeTeams.find(t => t.id === selectedTeamDetails);
-                      if (!team) return null;
-                      const members = getTeamMembers(team.id);
+                      const team = teams.find(t => t._id === selectedTeamDetails);
+                      if (!team) {
+                        return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-500">Loading team details...</p>
+                          </div>
+                        );
+                      }
+                      const members = getTeamMembers(team._id);
+                      const eventName = typeof team.eventId === 'object' ? team.eventId.name : 'Unknown Event';
+                      const leader = typeof team.teamLeader === 'object' ? team.teamLeader : null;
                       return (
                         <div className="space-y-6">
                           {/* Team Information */}
                           <div className="grid grid-cols-2 gap-4 pb-4 border-b">
                             <div>
                               <label className="text-sm font-medium text-gray-500">Team Name</label>
-                              <p className="text-lg font-semibold text-gray-900">{team.name}</p>
+                              <p className="text-lg font-semibold text-gray-900">{team.teamName || 'Individual'}</p>
                             </div>
                             <div>
-                              <label className="text-sm font-medium text-gray-500">Team OJASS ID</label>
-                              <p className="text-lg font-semibold text-gray-900">{team.ojassId}</p>
+                              <label className="text-sm font-medium text-gray-500">Team ID</label>
+                              <p className="text-lg font-semibold text-gray-900">{team._id.slice(-6)}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Event</label>
-                              <p className="text-lg text-gray-900">{team.eventName}</p>
+                              <p className="text-lg text-gray-900">{eventName}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Team Leader</label>
-                              <p className="text-lg text-gray-900">{team.leader}</p>
+                              <p className="text-lg text-gray-900">{leader?.name || 'Unknown'}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Total Members</label>
-                              <p className="text-lg font-semibold text-gray-900">{team.members}</p>
+                              <p className="text-lg font-semibold text-gray-900">{team.teamMembers?.length || 0}</p>
                             </div>
                             <div>
                               <label className="text-sm font-medium text-gray-500">Registration Date</label>
-                              <p className="text-lg text-gray-900">{team.registeredAt}</p>
+                              <p className="text-lg text-gray-900">{new Date(team.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium text-gray-500">Verification Status</label>
+                              <input
+                                type="checkbox"
+                                checked={team.isVerified === true}
+                                onChange={async (e) => {
+                                  const newValue = e.target.checked;
+                                  // Optimistically update UI
+                                  setTeams((prev) =>
+                                    prev.map((t) =>
+                                      t._id === team._id ? { ...t, isVerified: newValue } : t
+                                    )
+                                  );
+                                  try {
+                                    const { teamAPI } = await import('@/lib/api');
+                                    const result = await teamAPI.update(team._id, { isVerified: newValue });
+                                    // Update with server response
+                                    setTeams((prev) =>
+                                      prev.map((t) =>
+                                        t._id === team._id ? { ...t, isVerified: result.team.isVerified ?? false } : t
+                                      )
+                                    );
+                                  } catch (error: unknown) {
+                                    console.error('Error updating team verification:', error);
+                                    // Revert on error
+                                    setTeams((prev) =>
+                                      prev.map((t) =>
+                                        t._id === team._id ? { ...t, isVerified: team.isVerified ?? false } : t
+                                      )
+                                    );
+                                    alert(error instanceof Error ? error.message : 'Failed to update team verification status');
+                                  }
+                                }}
+                                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {team.isVerified === true ? 'Verified' : 'Not Verified'}
+                              </span>
                             </div>
                           </div>
 
@@ -825,23 +1452,42 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                   {members.length > 0 ? (
-                                    members.map((member) => (
-                                      member && (
-                                        <tr key={member.id} className="hover:bg-gray-50">
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{member.id}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{member.ojassId}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{member.name}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{member.email}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{member.college}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                              member.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                            }`}>
-                                              {member.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      )
+                                    members.slice(0, 5).map((member, idx) => (
+                                      <tr key={typeof member === 'object' ? member._id : `${member}-${idx}`} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                          {typeof member === 'object' ? member._id?.slice(-6) : ((member as unknown as string)?.slice(-6) || 'N/A')}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                          {typeof member === 'object' ? member.ojassId : 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                          {typeof member === 'object' ? member.name : 'Unknown'}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                          {typeof member === 'object' ? member.email : 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                          {typeof member === 'object' ? member.collegeName : 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                          {(() => {
+                                            // Get payment status from member object or find in students array
+                                            let isPaid = false;
+                                            if (typeof member === 'object') {
+                                              isPaid = member.isPaid || false;
+                                            } else {
+                                              const student = students.find(s => s._id === member);
+                                              isPaid = student?.isPaid || false;
+                                            }
+                                            return (
+                                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                {isPaid ? 'Paid' : 'Unpaid'}
+                                              </span>
+                                            );
+                                          })()}
+                                        </td>
+                                      </tr>
                                     ))
                                   ) : (
                                     <tr>
@@ -862,8 +1508,422 @@ export default function Dashboard() {
               )}
             </div>
           )}
+
+          {/* Individual Events Section */}
+          {activeSection === 'individual' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Individual Event Registrations</h2>
+                <select
+                  value={individualEventFilter}
+                  onChange={(e) => setIndividualEventFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Events</option>
+                  {events.map((event) => (
+                    <option key={event._id} value={event._id}>{event.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Participant</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">OJASS ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Verified</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loadingIndividual ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                          Loading individual registrations...
+                        </td>
+                      </tr>
+                    ) : individualRegistrations.length > 0 ? (
+                      individualRegistrations
+                        .filter((reg) => {
+                          if (individualEventFilter === 'all') return true;
+                          const eventId = typeof reg.eventId === 'object' ? reg.eventId._id : reg.eventId;
+                          return eventId === individualEventFilter;
+                        })
+                        .map((reg) => {
+                          const eventName = typeof reg.eventId === 'object' ? reg.eventId.name : 'Unknown Event';
+                          const participant = typeof reg.teamLeader === 'object' ? reg.teamLeader : null;
+                          return (
+                            <tr key={reg._id} className="hover:bg-gray-50">
+                              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{eventName}</td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{participant?.name || 'Unknown'}</td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{participant?.ojassId || 'N/A'}</td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{participant?.email || 'N/A'}</td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${participant?.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                  {participant?.isPaid ? 'Paid' : 'Unpaid'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${reg.isVerified === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                  }`}>
+                                  {reg.isVerified === true ? 'Verified' : 'Unverified'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{new Date(reg.createdAt).toLocaleDateString()}</td>
+                              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={reg.isVerified === true}
+                                    onChange={async (e) => {
+                                      const newValue = e.target.checked;
+                                      // Optimistically update UI
+                                      setIndividualRegistrations((prev) =>
+                                        prev.map((r) =>
+                                          r._id === reg._id ? { ...r, isVerified: newValue } : r
+                                        )
+                                      );
+                                      try {
+                                        const { teamAPI } = await import('@/lib/api');
+                                        const result = await teamAPI.update(reg._id, { isVerified: newValue });
+                                        // Update with server response
+                                        setIndividualRegistrations((prev) =>
+                                          prev.map((r) =>
+                                            r._id === reg._id ? { ...r, isVerified: result.team.isVerified ?? false } : r
+                                          )
+                                        );
+                                      } catch (error: unknown) {
+                                        console.error('Error updating registration verification:', error);
+                                        // Revert on error
+                                        setIndividualRegistrations((prev) =>
+                                          prev.map((r) =>
+                                            r._id === reg._id ? { ...r, isVerified: reg.isVerified ?? false } : r
+                                          )
+                                        );
+                                        alert(error instanceof Error ? error.message : 'Failed to update verification status');
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                    title={reg.isVerified === true ? 'Unverify' : 'Verify'}
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button
+                                    onClick={() => setSelectedTeamDetails(reg._id)}
+                                    className="text-indigo-600 hover:text-indigo-800 transition-colors"
+                                    title="View Details"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                          No individual registrations found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Individual Registration Details Modal */}
+              {selectedTeamDetails && individualRegistrations.find(r => r._id === selectedTeamDetails) && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setSelectedTeamDetails(null)}>
+                  <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        Individual Registration Details
+                      </h3>
+                      <button
+                        onClick={() => setSelectedTeamDetails(null)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    {(() => {
+                      const reg = individualRegistrations.find(r => r._id === selectedTeamDetails);
+                      if (!reg) {
+                        return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-500">Loading registration details...</p>
+                          </div>
+                        );
+                      }
+                      const eventName = typeof reg.eventId === 'object' ? reg.eventId.name : 'Unknown Event';
+                      const participant = typeof reg.teamLeader === 'object' ? reg.teamLeader : null;
+                      return (
+                        <div className="space-y-6">
+                          {/* Registration Information */}
+                          <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Event</label>
+                              <p className="text-lg font-semibold text-gray-900">{eventName}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Registration ID</label>
+                              <p className="text-lg font-semibold text-gray-900">{reg._id.slice(-6)}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Participant</label>
+                              <p className="text-lg text-gray-900">{participant?.name || 'Unknown'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-500">Registration Date</label>
+                              <p className="text-lg text-gray-900">{new Date(reg.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm font-medium text-gray-500">Verification Status</label>
+                              <input
+                                type="checkbox"
+                                checked={reg.isVerified === true}
+                                onChange={async (e) => {
+                                  const newValue = e.target.checked;
+                                  // Optimistically update UI
+                                  setIndividualRegistrations((prev) =>
+                                    prev.map((r) =>
+                                      r._id === reg._id ? { ...r, isVerified: newValue } : r
+                                    )
+                                  );
+                                  try {
+                                    const { teamAPI } = await import('@/lib/api');
+                                    const result = await teamAPI.update(reg._id, { isVerified: newValue });
+                                    // Update with server response
+                                    setIndividualRegistrations((prev) =>
+                                      prev.map((r) =>
+                                        r._id === reg._id ? { ...r, isVerified: result.team.isVerified ?? false } : r
+                                      )
+                                    );
+                                  } catch (error: unknown) {
+                                    console.error('Error updating registration verification:', error);
+                                    // Revert on error
+                                    setIndividualRegistrations((prev) =>
+                                      prev.map((r) =>
+                                        r._id === reg._id ? { ...r, isVerified: reg.isVerified ?? false } : r
+                                      )
+                                    );
+                                    alert(error instanceof Error ? error.message : 'Failed to update verification status');
+                                  }
+                                }}
+                                className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {reg.isVerified === true ? 'Verified' : 'Not Verified'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Participant Details */}
+                          <div>
+                            <h4 className="text-xl font-semibold text-gray-800 mb-4">Participant Details</h4>
+                            <div className="bg-gray-50 rounded-lg p-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">Name</label>
+                                  <p className="text-sm text-gray-900">{participant?.name || 'Unknown'}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">OJASS ID</label>
+                                  <p className="text-sm text-gray-900">{participant?.ojassId || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">Email</label>
+                                  <p className="text-sm text-gray-900">{participant?.email || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">College</label>
+                                  <p className="text-sm text-gray-900">{participant?.collegeName || 'N/A'}</p>
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium text-gray-500">Payment Status</label>
+                                  <p className="text-sm">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${participant?.isPaid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                      }`}>
+                                      {participant?.isPaid ? 'Paid' : 'Unpaid'}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notifications Section */}
+          {activeSection === 'notifications' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Notifications</h2>
+                <button
+                  onClick={() => {
+                    setShowNotificationModal(true);
+                    setNotificationForm({ title: '', description: '' });
+                    setError('');
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
+                >
+                  + Send Notification
+                </button>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
+
+              {loadingNotifications ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  <p className="mt-2 text-gray-600">Loading notifications...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <p className="text-gray-500">No notifications sent yet.</p>
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div
+                        key={notification._id}
+                        className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                              {notification.title}
+                            </h3>
+                            <p className="text-gray-600 mb-3">{notification.description}</p>
+                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                              <span>
+                                Sent: {new Date(notification.createdAt).toLocaleString()}
+                              </span>
+                              {notification.recipients && notification.recipients.length > 0 && (
+                                <span>
+                                  Recipients: {notification.recipients.length} user(s)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Send Notification</h2>
+                <button
+                  onClick={() => {
+                    setShowNotificationModal(false);
+                    setNotificationForm({ title: '', description: '' });
+                    setError('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={notificationForm.title}
+                    onChange={(e) =>
+                      setNotificationForm({ ...notificationForm, title: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Enter notification title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    value={notificationForm.description}
+                    onChange={(e) =>
+                      setNotificationForm({ ...notificationForm, description: e.target.value })
+                    }
+                    rows={6}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Enter notification description"
+                  />
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> This notification will be sent to all users as a push notification and stored in their dashboard.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowNotificationModal(false);
+                      setNotificationForm({ title: '', description: '' });
+                      setError('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
+                    disabled={sendingNotification}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateNotification}
+                    disabled={sendingNotification || !notificationForm.title || !notificationForm.description}
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingNotification ? 'Sending...' : 'Send Notification'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
